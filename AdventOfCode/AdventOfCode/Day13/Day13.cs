@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -79,15 +79,15 @@ namespace AdventOfCode
             List<Pair> pairs = ExtractPairs(input);
 
 
-            int sum = 0;
+            List<int> indexes = new List<int>();
             for (int i = 0; i < pairs.Count; i++)
             {
                 if (pairs[i].Left.IsOrderedCompareTo(pairs[i].Right).ordered)
                 {
-                    sum += i + 1;
+                    indexes.Add(i+1);
                 }
             }
-            return sum;
+            return indexes.Sum();
         }
 
         public long Compute2(string filePath)
