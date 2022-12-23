@@ -10,239 +10,202 @@ namespace AdventOfCode
 {
     public class Day16
     {
-        public class State
+        public class Valve
         {
             public string Key { get; set; }
-            public List<string> SecondaryKey { get; set; } = new List<string>();
             public int Value { get; set; }
-            public int Cost { get; set; }
-            public int Turn { get; set; } = 1;
-            public int TotalValue { get; set; }
-            public List<string> NextState { get; set; }
-            public double Heuristic { get; set; }
-            public List<string> OpenValved { get; set; } = new List<string>();
-            public string OpenNextTurn { get; set; } = string.Empty;
-            public string ToString() =>
-                Key + ";" + string.Join(",", OpenValved.OrderBy(x => x).ToList());
+            public List<(string key, int cost)> Neighbours { get; set; }
         }
 
-        public class DoubleState
+        public class ValveState
         {
-            public State Human { get; set; }
-            public State Elephant { get; set; }
+            public Valve Valve { get; set; }
             public int Cost { get; set; }
-            public double Heuristic { get; set; }
-            public int Value { get; set; }
-            public int TotalValue { get; set; }
-            public int Turn { get; set; } = 1;
-            public List<string> Steps { get; set; } = new List<string>();
-            public HashSet<string> JoinedOpenValves()
-            {
-                HashSet<string> valves = new HashSet<string>();
-                Human.OpenValved.ForEach(x => valves.Add(x));
-                Elephant.OpenValved.ForEach(x => valves.Add(x));
-                return valves;
-            }
-            public string ToString() =>
-                Human.Key + "," + Elephant.Key + ";" + String.Join(",", JoinedOpenValves().OrderBy(x => x).ToList());
+            public int Heuristic { get; set; }
+            public int SumValue { get; set; }
+            public int Turn { get; set; }
+            public int Pressure { get; set; }
+            public List<string> Opened { get; set; } = new List<string>();
+            public string ToString() => $"{Valve.Key}:{string.Join(",",Opened.OrderBy(x => x).ToList())}";
         }
 
         public long Compute(string filePath)
         {
             var input = FileReader.GetFileContent(filePath).ToList();
-            Dictionary<string, State> valves = ReadValves(input);
-            List<string> interestingValves = valves.Values.Where(x => x.Value > 0).Select(x => x.Key).ToList();
-            int maxPressure = valves.Values.Where(x => x.Value > 0).Select(x => x.Value).Sum();
-            List<State> openList = new List<State>();
-            openList.Add(valves["AA"]);
-            HashSet<string> closedList = new HashSet<string>();
-            State current = null;
-            openList[0].Cost = maxPressure;
+            Dictionary<string, Valve> valves = ReadValves(input);
+            List<Valve> interestingValves = valves.Values.Where(x => x.Value > 0).ToList();
+            List<(string start, string end)> interestingPaths = new List<(string start, string end)>();
 
+            Dictionary<string, Valve> simpleValves = new Dictionary<string, Valve>();
+            foreach (var valve in interestingValves.Append(new Valve { Key = "AA" }))
+            {
+                Valve simpleValve = new Valve
+                {
+                    Key = valve.Key,
+                    Value = valve.Value,
+                    Neighbours = new List<(string key, int cost)>()
+                };
+
+                foreach (var destinationValve in interestingValves)
+                {
+                    if (destinationValve.Key != valve.Key)
+                    {
+                        simpleValve.Neighbours.Add((destinationValve.Key, GetLowestCost(valve.Key, destinationValve.Key, valves)));
+                    }
+                }
+                simpleValves.Add(simpleValve.Key, simpleValve);
+            }
+            List<Valve> orderedValve = new List<Valve>();
+            while (true)
+            {
+                if (orderedValve)
+            }
+
+            var permutations = GetPermutations(simpleValves.Values.ToList(), simpleValves.Values.Count()).ToList();
+            return 0;
+        }
+
+        public static IEnumerable<IEnumerable<T>> GetPermutations<T>(IEnumerable<T> list, int length)
+        {
+            if (length == 1) return list.Select(t => new T[] { t });
+
+            return GetPermutations(list, length - 1)
+                .SelectMany(t => list.Where(e => !t.Contains(e)),
+                    (t1, t2) => t1.Concat(new T[] { t2 }));
+        }
+
+        public int OptimizeOpening(string start, Dictionary<string, Valve> valves)
+        {
+            List<ValveState> openList = new List<ValveState>();
+            int maxPressure = valves.Sum(x => x.Value.Value);
+            openList.Add(
+                new ValveState
+                {
+                    Valve = valves[start]
+                });
+            HashSet<string> closedList = new HashSet<string>();
+            List<ValveState> possibles = new List<ValveState>();
+            ValveState current = null;
             while (openList.Any())
             {
-                openList = openList.OrderBy(x => x.Heuristic).ToList();
+                openList.OrderBy(x => x.Heuristic);
                 current = openList.First();
                 openList.Remove(current);
 
-                if (interestingValves.All(x => current.OpenValved.Contains(x)) || current.Turn == 30)
+                if (openList.All(x => x.Turn == 30)) 
                 {
+                    possibles.AddRange(openList);
                     break;
+                }
+                else if (current.Turn == 30)
+                {
+                    possibles.Add(current);
                 }
                 else
                 {
-                    foreach (var neighbour in current.NextState)
+                    foreach (var valve in current.Valve.Neighbours)
                     {
-                        bool isValvedAlreadyOpen = current.OpenValved.Contains(neighbour);
-                        bool isValvedInteresting = interestingValves.Contains(neighbour);
-                        if (current.Turn + 1 <= 30)
+                        if (current.Turn + valve.cost > 30)
                         {
-                            var newCost = current.Cost + (maxPressure - current.Value);
-                            var state = new State
+                            var newCost = current.Cost + (maxPressure - current.SumValue) * (30 - current.Turn);
+                            var newValveState = new ValveState
                             {
-                                Key = neighbour,
+                                Valve = new Valve { Key = "##" },
                                 Cost = newCost,
-                                Turn = current.Turn + 1,
-                                Value = current.Value,
-                                TotalValue = current.TotalValue + current.Value,
-                                Heuristic = newCost + (maxPressure - current.Value),
-                                NextState = valves[neighbour].NextState,
-                                OpenValved = current.OpenValved.ToArray().ToList(),
+                                Heuristic = newCost + (maxPressure - current.SumValue),
+                                Turn = 30,
+                                SumValue = current.SumValue,
+                                Opened = current.Opened.ToArray().ToList(),
+                                Pressure = current.Pressure + (30 - current.Turn) * current.SumValue
                             };
-                            if (!(openList.Where(x => x.ToString() == state.ToString()).Select(x => x.Cost).Any(x => x <= state.Cost)
-                                || closedList.Contains(state.ToString())))
-                            {
-                                openList.Add(state);
-                            }
                         }
-                        if (!isValvedAlreadyOpen && isValvedInteresting && (current.Turn + 2) <= 30)
+                        else if (!current.Opened.Contains(valve.key))
                         {
-                            var otherNewCost = current.Cost + (maxPressure * 2 - current.Value * 2 - valves[neighbour].Value);
-                            var otherState = new State
+                            var newCost = current.Cost + (maxPressure - current.SumValue) * valve.cost;
+                            var newValveState = new ValveState
                             {
-                                Key = neighbour,
-                                Cost = otherNewCost,
-                                Turn = current.Turn + 2,
-                                Value = current.Value + valves[neighbour].Value,
-                                TotalValue = current.TotalValue + current.Value * 2 + valves[neighbour].Value,
-                                Heuristic = otherNewCost + (maxPressure - current.Value - valves[neighbour].Value),
-                                NextState = valves[neighbour].NextState,
-                                OpenValved = current.OpenValved.ToArray().Append(neighbour).ToList(),
+                                Valve = valves[valve.key],
+                                Cost = newCost,
+                                Heuristic = newCost + (maxPressure - current.SumValue),
+                                Turn = current.Turn + valve.cost,
+                                SumValue = current.SumValue + valves[valve.key].Value,
+                                Opened = current.Opened.ToArray().Append(valve.key).ToList(),
+                                Pressure = current.Pressure + valve.cost * current.SumValue
                             };
-                            if (!(openList.Where(x => x.ToString() == otherState.ToString()).Select(x => x.Cost).Any(x => x <= otherState.Cost)
-                            || closedList.Contains(otherState.ToString())))
+                            if (!(openList.Where(x => x.Valve.Key == newValveState.Valve.Key).Select(x => x.Cost).Any(x => x <= newValveState.Cost)
+                                || closedList.Contains(newValveState.ToString())))
                             {
-                                openList.Add(otherState);
+                                openList.Add(newValveState);
                             }
                         }
-
                     }
                     closedList.Add(current.ToString());
                 }
             }
-
-            return (30 - current.Turn) * current.Value + current.TotalValue;
+            return possibles.Max(x => x.Pressure);
         }
 
-        private static Dictionary<string, State> ReadValves(List<string> input)
+        public int GetLowestCost(string start, string end, Dictionary<string, Valve> valves)
         {
-            Dictionary<string, State> valves = new Dictionary<string, State>();
+            List<ValveState> openList = new List<ValveState>();
+            openList.Add(
+                new ValveState
+                {
+                    Valve = valves[start]
+                });
+            HashSet<string> closedList = new HashSet<string>();
+            ValveState current = null;
+            while (openList.Any())
+            {
+                openList.OrderBy(x => x.Cost);
+                current = openList.First();
+                openList.Remove(current);
+
+                if (current.Valve.Key == end)
+                {
+                    return current.Cost + 1;
+                }
+                else
+                {
+                    foreach (var valve in valves[current.Valve.Key].Neighbours)
+                    {
+                        var newValveState = new ValveState
+                        {
+                            Valve = valves[valve.key],
+                            Cost = current.Cost + 1
+                        };
+                        if (!(openList.Where(x => x.Valve.Key == newValveState.Valve.Key).Select(x => x.Cost).Any(x => x <= newValveState.Cost)
+                                   || closedList.Contains(newValveState.Valve.Key)))
+                        {
+                            openList.Add(newValveState);
+                        }
+                    }
+                }
+            }
+            return 0;
+        }
+
+
+        private static Dictionary<string, Valve> ReadValves(List<string> input)
+        {
+            Dictionary<string, Valve> valves = new Dictionary<string, Valve>();
             Regex regex = new Regex(@"Valve ([A-Z]+) has flow rate=([0-9]+); tunnel[s]* lead[s]* to valve[s]* ([A-Z\ \,]+)");
 
             foreach (var line in input)
             {
                 Match match = regex.Match(line);
-                State state = new State
+                Valve valve = new Valve
                 {
                     Key = match.Groups[1].Value,
-                    SecondaryKey = new List<string> { match.Groups[1].Value, match.Groups[1].Value },
                     Value = int.Parse(match.Groups[2].Value),
-                    NextState = match.Groups[3].Value.Split(",").Select(x => x.Trim()).ToList()
+                    Neighbours = match.Groups[3].Value.Split(",").Select(x => x.Trim()).Select(x => (x, 1)).ToList()
                 };
-                valves.Add(state.Key, state);
+                valves.Add(valve.Key, valve);
             }
 
             return valves;
         }
 
-        public List<string> GetAllPossibleNextSteps(List<string> secondaryKeys, Dictionary<string, State> valves)
-        {
-            List<string> result = new List<string>();
-            return result;
-        }
-
-        public long Compute2(string filePath)
-        {
-            var input = FileReader.GetFileContent(filePath).ToList();
-            Dictionary<string, State> valves = ReadValves(input);
-            List<string> interestingValves = valves.Values.Where(x => x.Value > 0).Select(x => x.Key).ToList();
-            int maxPressure = valves.Values.Where(x => x.Value > 0).Select(x => x.Value).Sum();
-            List<DoubleState> openList = new List<DoubleState>();
-            openList.Add(new DoubleState { Human = valves["AA"], Elephant = valves["AA"] });
-            HashSet<string> closedList = new HashSet<string>();
-            DoubleState current = null;
-            openList[0].Cost = 0;
-
-            while (openList.Any())
-            {
-                openList = openList.OrderBy(x => x.Heuristic).ToList();
-                current = openList.First();
-                openList.Remove(current);
-
-                if (interestingValves.All(x => current.JoinedOpenValves().Contains(x)) || current.Turn == 26)
-                {
-                    break;
-                }
-                else
-                {
-                    if (current.Turn + 1 <= 26)
-                    {
-                        var nextHumanSteps = current.Human.NextState.ToList();
-                        if (interestingValves.Contains(current.Human.Key) 
-                            && !current.JoinedOpenValves().Contains(current.Human.Key) 
-                            && current.Human.OpenNextTurn == string.Empty)
-                        {
-                            nextHumanSteps.Add(current.Human.Key);
-                        }
-                        foreach (var nextHumanStep in nextHumanSteps)
-                        {
-                            var nextElephantSteps = current.Elephant.NextState.ToList();
-                            if (interestingValves.Contains(current.Elephant.Key) 
-                                && !current.JoinedOpenValves().Contains(current.Elephant.Key) 
-                                && current.Elephant.Key != nextHumanStep
-                                && current.Elephant.OpenNextTurn == string.Empty)
-                            {
-                                nextElephantSteps.Add(current.Elephant.Key);
-                            }
-                            foreach (var nextElephantStep in nextElephantSteps)
-                            {
-                                var openedThisTurn = current.Human.Key == nextHumanStep ? valves[nextHumanStep].Value : 0;
-                                openedThisTurn += current.Elephant.Key == nextElephantStep ?  valves[nextElephantStep].Value : 0;
-                                var newCost = current.Cost + (maxPressure - current.Value - (openedThisTurn / 2));
-                                var doubleState = new DoubleState
-                                {
-                                    Human = new State
-                                    {
-                                        Key = nextHumanStep,
-                                        NextState = valves[nextHumanStep].NextState,
-                                        OpenValved = current.Human.OpenNextTurn != string.Empty ? current.Human.OpenValved.ToArray().Append(current.Human.OpenNextTurn).ToList() : current.Human.OpenValved.ToArray().ToList(),
-                                        OpenNextTurn = current.Human.Key == nextHumanStep ? nextHumanStep : string.Empty
-                                    },
-                                    Elephant = new State
-                                    {
-                                        Key = nextElephantStep,
-                                        NextState = valves[nextElephantStep].NextState,
-                                        OpenValved = current.Elephant.OpenNextTurn != string.Empty ? current.Elephant.OpenValved.ToArray().Append(current.Elephant.OpenNextTurn).ToList() : current.Elephant.OpenValved.ToArray().ToList(),
-                                        OpenNextTurn = current.Elephant.Key == nextElephantStep ? nextElephantStep : string.Empty
-                                    },
-                                    Cost = newCost,
-                                    Heuristic = newCost + (maxPressure - current.Value),
-                                    Value = current.Value + openedThisTurn,
-                                    TotalValue = current.TotalValue + current.Value,
-                                    Turn = current.Turn + 1,
-                                    Steps = current.Steps.ToArray().ToList()
-                                };
-
-                                if (current.Human.OpenNextTurn != string.Empty)
-                                {
-
-                                }
-                                doubleState.Steps.Add(doubleState.ToString() + "+" + doubleState.Value + "+" + doubleState.TotalValue);
-                                if (!(openList.Where(x => x.ToString() == doubleState.ToString()).Select(x => x.Cost).Any(x => x <= doubleState.Cost)
-                                    || closedList.Contains(doubleState.ToString())))
-                                {
-                                    openList.Add(doubleState);
-                                }
-                            }
-                        }
-
-                    }
-                    
-                    closedList.Add(current.ToString());
-                }
-            }
-
-            return (26 - current.Turn) * current.Value + current.TotalValue;
-        }
+   
     }
 }

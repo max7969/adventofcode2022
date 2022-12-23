@@ -53,7 +53,7 @@ namespace AdventOfCode.Tests
             Day16 day = new Day16();
 
             // Act
-            long result = day.Compute2(filePath);
+            long result = day.Compute(filePath);
 
             // Assert
             result.Should().Be(1707);
@@ -67,7 +67,7 @@ namespace AdventOfCode.Tests
             Day16 day = new Day16();
 
             // Act
-            long result = day.Compute2(filePath);
+            long result = day.Compute(filePath);
 
             // Result
             _output.WriteLine(result.ToString());
