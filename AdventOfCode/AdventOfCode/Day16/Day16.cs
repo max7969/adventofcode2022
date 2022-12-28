@@ -26,7 +26,7 @@ namespace AdventOfCode
             public int Turn { get; set; }
             public int Pressure { get; set; }
             public List<string> Opened { get; set; } = new List<string>();
-            public string ToString() => $"{Valve.Key}:{string.Join(",",Opened.OrderBy(x => x).ToList())}";
+            public string ToString() => $"{Valve.Key}:{string.Join(",",Opened.OrderBy(x => x).ToList())}:{Turn}";
         }
 
         public long Compute(string filePath)
@@ -55,14 +55,8 @@ namespace AdventOfCode
                 }
                 simpleValves.Add(simpleValve.Key, simpleValve);
             }
-            List<Valve> orderedValve = new List<Valve>();
-            while (true)
-            {
-                if (orderedValve)
-            }
 
-            var permutations = GetPermutations(simpleValves.Values.ToList(), simpleValves.Values.Count()).ToList();
-            return 0;
+            return OptimizeOpening("AA", simpleValves);
         }
 
         public static IEnumerable<IEnumerable<T>> GetPermutations<T>(IEnumerable<T> list, int length)
@@ -88,51 +82,56 @@ namespace AdventOfCode
             ValveState current = null;
             while (openList.Any())
             {
-                openList.OrderBy(x => x.Heuristic);
+
+                openList = openList.OrderBy(x => x.Heuristic).ToList();
                 current = openList.First();
+
                 openList.Remove(current);
 
-                if (openList.All(x => x.Turn == 30)) 
+                openList = openList.Where(x => x.Turn <= current.Turn || x.Pressure > current.Pressure).ToList();
+
+
+                if (current.Turn == 30)
                 {
-                    possibles.AddRange(openList);
                     break;
-                }
-                else if (current.Turn == 30)
-                {
-                    possibles.Add(current);
                 }
                 else
                 {
+                    if (true)
+                    {
+                        var newCost = current.Cost + (maxPressure - current.SumValue) * (30 - current.Turn);
+                        var newValveState = new ValveState
+                        {
+                            Valve = new Valve { Key = "##" },
+                            Cost = newCost,
+                            Heuristic = newCost,
+                            Turn = 30,
+                            SumValue = current.SumValue,
+                            Opened = current.Opened.ToArray().ToList(),
+                            Pressure = current.Pressure + (30 - current.Turn) * current.SumValue
+                        };
+                        if (!(openList.Where(x => x.ToString() == newValveState.ToString()).Select(x => x.Cost).Any(x => x <= newValveState.Cost)
+                            || closedList.Contains(newValveState.ToString())))
+                        {
+                            openList.Add(newValveState);
+                        }
+                    }
                     foreach (var valve in current.Valve.Neighbours)
                     {
-                        if (current.Turn + valve.cost > 30)
-                        {
-                            var newCost = current.Cost + (maxPressure - current.SumValue) * (30 - current.Turn);
-                            var newValveState = new ValveState
-                            {
-                                Valve = new Valve { Key = "##" },
-                                Cost = newCost,
-                                Heuristic = newCost + (maxPressure - current.SumValue),
-                                Turn = 30,
-                                SumValue = current.SumValue,
-                                Opened = current.Opened.ToArray().ToList(),
-                                Pressure = current.Pressure + (30 - current.Turn) * current.SumValue
-                            };
-                        }
-                        else if (!current.Opened.Contains(valve.key))
+                        if (!current.Opened.Contains(valve.key))
                         {
                             var newCost = current.Cost + (maxPressure - current.SumValue) * valve.cost;
                             var newValveState = new ValveState
                             {
                                 Valve = valves[valve.key],
                                 Cost = newCost,
-                                Heuristic = newCost + (maxPressure - current.SumValue),
+                                Heuristic = newCost + (30 - (current.Turn + valve.cost)),
                                 Turn = current.Turn + valve.cost,
                                 SumValue = current.SumValue + valves[valve.key].Value,
                                 Opened = current.Opened.ToArray().Append(valve.key).ToList(),
                                 Pressure = current.Pressure + valve.cost * current.SumValue
                             };
-                            if (!(openList.Where(x => x.Valve.Key == newValveState.Valve.Key).Select(x => x.Cost).Any(x => x <= newValveState.Cost)
+                            if (!(openList.Where(x => x.ToString() == newValveState.ToString()).Select(x => x.Cost).Any(x => x <= newValveState.Cost)
                                 || closedList.Contains(newValveState.ToString())))
                             {
                                 openList.Add(newValveState);
@@ -142,7 +141,7 @@ namespace AdventOfCode
                     closedList.Add(current.ToString());
                 }
             }
-            return possibles.Max(x => x.Pressure);
+            return current.Pressure;
         }
 
         public int GetLowestCost(string start, string end, Dictionary<string, Valve> valves)
@@ -205,7 +204,5 @@ namespace AdventOfCode
 
             return valves;
         }
-
-   
     }
 }
